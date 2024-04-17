@@ -3,7 +3,7 @@ use std::{
     io::{Error, ErrorKind},
     str::FromStr,
 };
-use warp::{http::StatusCode, reject::Reject, Filter, Rejection, Reply};
+use warp::{http::Method, http::StatusCode, reject::Reject, Filter, Rejection, Reply};
 
 #[derive(Debug, Serialize)]
 struct Question {
@@ -73,13 +73,18 @@ async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
 
 #[tokio::main]
 async fn main() {
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_header("content-type")
+        .allow_methods(&[Method::PUT, Method::DELETE, Method::POST, Method::GET]);
+
     let get_items = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
         .and_then(get_questions)
         .recover(return_error);
 
-    let routes = get_items;
+    let routes = get_items.with(cors);
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }

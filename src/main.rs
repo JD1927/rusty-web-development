@@ -1,10 +1,11 @@
+use serde::Serialize;
 use std::{
     io::{Error, ErrorKind},
     str::FromStr,
 };
 use warp::Filter;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct Question {
     id: QuestionId,
     title: String,
@@ -12,7 +13,7 @@ struct Question {
     tags: Option<Vec<String>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct QuestionId(String);
 
 impl Question {
@@ -37,9 +38,25 @@ impl FromStr for QuestionId {
     }
 }
 
+async fn get_questions() -> Result<impl warp::Reply, warp::Rejection> {
+    let question = Question::new(
+        QuestionId::from_str("1").expect("No id provided"),
+        "First question".to_string(),
+        "Content of the question".to_string(),
+        Some(vec!["faq".to_string()]),
+    );
+
+    Ok(warp::reply::json(&question))
+}
+
 #[tokio::main]
 async fn main() {
-    let hello = warp::get().map(|| format!("Hello World!"));
+    let get_items = warp::get()
+        .and(warp::path("questions"))
+        .and(warp::path::end())
+        .and_then(get_questions);
 
-    warp::serve(hello).run(([127, 0, 0, 1], 3030)).await;
+    let routes = get_items;
+
+    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }

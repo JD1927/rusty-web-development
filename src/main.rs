@@ -1,10 +1,18 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, num};
 use warp::{
     filters::cors::CorsForbidden,
     http::{Method, StatusCode},
+    reject::Reject,
     Filter, Rejection, Reply,
 };
+
+#[derive(Debug)]
+enum Error {
+    MissingParameters,
+    InvalidRange,
+    ParseInt(num::ParseIntError),
+}
 
 #[derive(Clone)]
 struct Store {
@@ -21,6 +29,26 @@ struct Question {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 struct QuestionId(String);
+
+#[derive(Debug)]
+struct Pagination {
+    start: usize,
+    end: usize,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Error::ParseInt(ref err) => {
+                write!(f, "Cannot parse parameter: {}", err)
+            }
+            Error::MissingParameters => write!(f, "Missing parameter"),
+            Error::InvalidRange => write!(f, "Invalid pagination range"),
+        }
+    }
+}
+
+impl Reject for Error {}
 
 impl Store {
     fn new() -> Self {
@@ -39,22 +67,45 @@ async fn get_questions(
     params: HashMap<String, String>,
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    println!("{:#?}", params);
+    if !params.is_empty() {
+        let res: Vec<Question> = store.questions.values().cloned().collect();
+        let store_length = res.len();
+        let pagination = extract_pagination(params, store_length)?;
+        let res = &res[pagination.start..pagination.end];
 
-    let mut start = 0;
+        Ok(warp::reply::json(&res))
+    } else {
+        let res: Vec<Question> = store.questions.values().cloned().collect();
 
-    if let Some(n) = params.get("start") {
-        start = n.parse::<usize>().expect("Could not parse start");
+        Ok(warp::reply::json(&res))
     }
-    println!("{}", start);
+}
 
-    let res: Vec<Question> = store.questions.values().cloned().collect();
-    Ok(warp::reply::json(&res))
+fn extract_pagination(
+    params: HashMap<String, String>,
+    store_length: usize,
+) -> Result<Pagination, Error> {
+    if let (Some(start), Some(end)) = (params.get("start"), params.get("end")) {
+        let start = start.parse::<usize>().map_err(Error::ParseInt)?;
+        let end = end.parse::<usize>().map_err(Error::ParseInt)?;
+
+        if start < end && start <= store_length && end <= store_length {
+            return Ok(Pagination { start, end });
+        } else {
+            return Err(Error::InvalidRange);
+        }
+    }
+    Err(Error::MissingParameters)
 }
 
 async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
     println!("{:?}", r);
-    if let Some(error) = r.find::<CorsForbidden>() {
+    if let Some(error) = r.find::<Error>() {
+        Ok(warp::reply::with_status(
+            error.to_string(),
+            StatusCode::RANGE_NOT_SATISFIABLE,
+        ))
+    } else if let Some(error) = r.find::<CorsForbidden>() {
         Ok(warp::reply::with_status(
             error.to_string(),
             StatusCode::FORBIDDEN,

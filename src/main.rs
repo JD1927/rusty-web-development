@@ -14,6 +14,7 @@ enum Error {
     MissingParameters,
     InvalidRange,
     ParseInt(num::ParseIntError),
+    QuestionNotFound,
 }
 
 #[derive(Clone)]
@@ -46,6 +47,7 @@ impl std::fmt::Display for Error {
             }
             Error::MissingParameters => write!(f, "Missing parameter"),
             Error::InvalidRange => write!(f, "Invalid pagination range"),
+            Error::QuestionNotFound => write!(f, "Question not found!"),
         }
     }
 }
@@ -76,6 +78,18 @@ async fn add_question(
         .insert(question.id.clone(), question);
 
     Ok(warp::reply::with_status("Question added", StatusCode::OK))
+}
+
+async fn update_question(
+    id: String,
+    store: Store,
+    question: Question,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    match store.questions.write().await.get_mut(&QuestionId(id)) {
+        Some(q) => *q = question,
+        None => return Err(warp::reject::custom(Error::QuestionNotFound)),
+    }
+    Ok(warp::reply::with_status("Question updated", StatusCode::OK))
 }
 
 async fn get_questions(
@@ -156,8 +170,17 @@ async fn main() {
         .and(warp::body::json())
         .and_then(add_question);
 
+    let update_question = warp::put()
+        .and(warp::path("questions"))
+        .and(warp::path::param::<String>())
+        .and(warp::path::end())
+        .and(store_filter.clone())
+        .and(warp::body::json())
+        .and_then(update_question);
+
     let routes = get_questions
         .or(add_question)
+        .or(update_question)
         .with(cors)
         .recover(return_error);
 

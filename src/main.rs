@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::{collections::HashMap, num};
+use tokio::sync::RwLock;
 use warp::{
     filters::cors::CorsForbidden,
     http::{Method, StatusCode},
@@ -16,7 +18,7 @@ enum Error {
 
 #[derive(Clone)]
 struct Store {
-    questions: HashMap<QuestionId, Question>,
+    questions: Arc<RwLock<HashMap<QuestionId, Question>>>,
 }
 
 #[derive(Debug, Serialize, Clone, Deserialize)]
@@ -53,7 +55,7 @@ impl Reject for Error {}
 impl Store {
     fn new() -> Self {
         Store {
-            questions: Self::init(),
+            questions: Arc::new(RwLock::new(Self::init())),
         }
     }
 
@@ -68,14 +70,14 @@ async fn get_questions(
     store: Store,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     if !params.is_empty() {
-        let res: Vec<Question> = store.questions.values().cloned().collect();
+        let res: Vec<Question> = store.questions.read().await.values().cloned().collect();
         let store_length = res.len();
         let pagination = extract_pagination(params, store_length)?;
         let res = &res[pagination.start..pagination.end];
 
         Ok(warp::reply::json(&res))
     } else {
-        let res: Vec<Question> = store.questions.values().cloned().collect();
+        let res: Vec<Question> = store.questions.read().await.values().cloned().collect();
 
         Ok(warp::reply::json(&res))
     }

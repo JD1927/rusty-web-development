@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::{collections::HashMap, num};
 use tokio::sync::RwLock;
 use warp::{
+    filters::body::BodyDeserializeError,
     filters::cors::CorsForbidden,
     http::{Method, StatusCode},
     reject::Reject,
@@ -138,6 +139,11 @@ async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             error.to_string(),
             StatusCode::FORBIDDEN,
+        ))
+    } else if let Some(error) = r.find::<BodyDeserializeError>() {
+        Ok(warp::reply::with_status(
+            error.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
         ))
     } else {
         Ok(warp::reply::with_status(

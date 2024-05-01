@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{collections::HashMap, num};
 use tokio::sync::RwLock;
+use uuid::Uuid;
 use warp::{
     filters::body::BodyDeserializeError,
     filters::cors::CorsForbidden,
@@ -26,7 +27,7 @@ struct Store {
 
 #[derive(Debug, Serialize, Clone, Deserialize)]
 struct Question {
-    id: QuestionId,
+    id: Option<QuestionId>,
     title: String,
     content: String,
     tags: Option<Vec<String>>,
@@ -85,7 +86,7 @@ async fn add_answer(
     params: HashMap<String, String>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let answer = Answer {
-        id: AnswerId("1".to_string()),
+        id: AnswerId(Uuid::new_v4().to_string()),
         content: params.get("content").unwrap().to_string(),
         question_id: QuestionId(params.get("questionId").unwrap().to_string()),
     };
@@ -101,11 +102,15 @@ async fn add_question(
     store: Store,
     question: Question,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    let question = Question {
+        id: Some(QuestionId(Uuid::new_v4().to_string())),
+        ..question
+    };
     store
         .questions
         .write()
         .await
-        .insert(question.id.clone(), question);
+        .insert(question.id.clone().unwrap(), question);
 
     Ok(warp::reply::with_status("Question added", StatusCode::OK))
 }

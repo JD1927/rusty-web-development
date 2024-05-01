@@ -13,10 +13,12 @@ use warp::{
 
 #[derive(Debug)]
 enum Error {
-    MissingParameters,
+    MissingParameters(String),
     InvalidRange,
     ParseInt(num::ParseIntError),
-    QuestionNotFound,
+    QuestionNotFound(String),
+    InvalidQuestionId,
+    Required(String),
 }
 
 #[derive(Clone)]
@@ -58,9 +60,21 @@ impl std::fmt::Display for Error {
             Error::ParseInt(ref err) => {
                 write!(f, "Cannot parse parameter: {}", err)
             }
-            Error::MissingParameters => write!(f, "Missing parameter"),
+            Error::MissingParameters(ref message) => {
+                write!(f, "Missing parameters: {}", message)
+            }
             Error::InvalidRange => write!(f, "Invalid pagination range"),
-            Error::QuestionNotFound => write!(f, "Question not found!"),
+            Error::QuestionNotFound(ref id) => {
+                write!(f, "Question with id '{}' not found!", id)
+            }
+            Error::InvalidQuestionId => write!(f, "Invalid question ID!"),
+            Error::Required(ref field) => {
+                write!(
+                    f,
+                    "Field '{}' is required. Cannot be empty or undefined",
+                    field
+                )
+            }
         }
     }
 }
@@ -82,13 +96,32 @@ impl Store {
 }
 
 async fn add_answer(
+    question_id: String,
     store: Store,
     params: HashMap<String, String>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    if question_id.is_empty() {
+        return Err(warp::reject::custom(Error::InvalidQuestionId));
+    };
+    let answer_content = match params.get("content") {
+        Some(content) => content.to_string(),
+        None => return Err(warp::reject::custom(Error::Required("content".to_string()))),
+    };
+
+    match store
+        .questions
+        .read()
+        .await
+        .get(&QuestionId(question_id.clone()))
+    {
+        Some(_) => (),
+        None => return Err(warp::reject::custom(Error::QuestionNotFound(question_id))),
+    }
+
     let answer = Answer {
         id: AnswerId(Uuid::new_v4().to_string()),
-        content: params.get("content").unwrap().to_string(),
-        question_id: QuestionId(params.get("questionId").unwrap().to_string()),
+        content: answer_content,
+        question_id: QuestionId(question_id),
     };
     store
         .answers
@@ -102,6 +135,12 @@ async fn add_question(
     store: Store,
     question: Question,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    if question.title.is_empty() {
+        return Err(warp::reject::custom(Error::Required("title".to_string())));
+    }
+    if question.content.is_empty() {
+        return Err(warp::reject::custom(Error::Required("content".to_string())));
+    }
     let question = Question {
         id: Some(QuestionId(Uuid::new_v4().to_string())),
         ..question
@@ -120,9 +159,10 @@ async fn update_question(
     store: Store,
     question: Question,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    let question_id = id.clone();
     match store.questions.write().await.get_mut(&QuestionId(id)) {
         Some(q) => *q = question,
-        None => return Err(warp::reject::custom(Error::QuestionNotFound)),
+        None => return Err(warp::reject::custom(Error::QuestionNotFound(question_id))),
     }
     Ok(warp::reply::with_status("Question updated", StatusCode::OK))
 }
@@ -146,19 +186,21 @@ async fn get_questions(
 }
 
 async fn get_question_by_id(id: String, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
+    let question_id = id.clone();
     match store.questions.read().await.get(&QuestionId(id)) {
         Some(question) => Ok(warp::reply::json(&question)),
-        None => Err(warp::reject::custom(Error::QuestionNotFound)),
+        None => Err(warp::reject::custom(Error::QuestionNotFound(question_id))),
     }
 }
 
 async fn delete_question(id: String, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
+    let question_id = id.clone();
     match store.questions.write().await.remove(&QuestionId(id)) {
         Some(_) => Ok(warp::reply::with_status(
             "Question deleted!",
             StatusCode::OK,
         )),
-        None => Err(warp::reject::custom(Error::QuestionNotFound)),
+        None => Err(warp::reject::custom(Error::QuestionNotFound(question_id))),
     }
 }
 
@@ -176,15 +218,16 @@ fn extract_pagination(
             return Err(Error::InvalidRange);
         }
     }
-    Err(Error::MissingParameters)
+    Err(Error::MissingParameters(
+        "Pagination requires 'start' and 'end' filters".to_string(),
+    ))
 }
 
 async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
-    println!("{:?}", r);
     if let Some(error) = r.find::<Error>() {
         Ok(warp::reply::with_status(
             error.to_string(),
-            StatusCode::RANGE_NOT_SATISFIABLE,
+            StatusCode::BAD_REQUEST,
         ))
     } else if let Some(error) = r.find::<CorsForbidden>() {
         Ok(warp::reply::with_status(
@@ -250,6 +293,8 @@ async fn main() {
         .and_then(get_question_by_id);
 
     let add_answer = warp::post()
+        .and(warp::path("questions"))
+        .and(warp::path::param::<String>())
         .and(warp::path("answers"))
         .and(warp::path::end())
         .and(store_filter.clone())

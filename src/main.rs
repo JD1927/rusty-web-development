@@ -21,6 +21,7 @@ enum Error {
 #[derive(Clone)]
 struct Store {
     questions: Arc<RwLock<HashMap<QuestionId, Question>>>,
+    answers: Arc<RwLock<HashMap<AnswerId, Answer>>>,
 }
 
 #[derive(Debug, Serialize, Clone, Deserialize)]
@@ -38,6 +39,16 @@ struct QuestionId(String);
 struct Pagination {
     start: usize,
     end: usize,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+struct AnswerId(String);
+
+#[derive(Debug, Serialize, Clone, Deserialize)]
+struct Answer {
+    id: AnswerId,
+    content: String,
+    question_id: QuestionId,
 }
 
 impl std::fmt::Display for Error {
@@ -59,6 +70,7 @@ impl Store {
     fn new() -> Self {
         Store {
             questions: Arc::new(RwLock::new(Self::init())),
+            answers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -66,6 +78,23 @@ impl Store {
         let file = include_str!("../question.json");
         serde_json::from_str(file).expect("can't read questions.json")
     }
+}
+
+async fn add_answer(
+    store: Store,
+    params: HashMap<String, String>,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    let answer = Answer {
+        id: AnswerId("1".to_string()),
+        content: params.get("content").unwrap().to_string(),
+        question_id: QuestionId(params.get("questionId").unwrap().to_string()),
+    };
+    store
+        .answers
+        .write()
+        .await
+        .insert(answer.id.clone(), answer);
+    Ok(warp::reply::with_status("Answer added", StatusCode::OK))
 }
 
 async fn add_question(
@@ -215,8 +244,16 @@ async fn main() {
         .and(store_filter.clone())
         .and_then(get_question_by_id);
 
+    let add_answer = warp::post()
+        .and(warp::path("answers"))
+        .and(warp::path::end())
+        .and(store_filter.clone())
+        .and(warp::body::form())
+        .and_then(add_answer);
+
     let routes = get_questions
         .or(add_question)
+        .or(add_answer)
         .or(update_question)
         .or(delete_question)
         .or(get_question_by_id)

@@ -237,6 +237,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "handle-errors"
+version = "0.1.0"
+dependencies = [
+ "warp",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,6 +615,7 @@ checksum = "d626bb9dae77e28219937af045c257c28bfd3f69333c512553507f5f9798cb76"
 name = "rusty-web-development"
 version = "0.1.0"
 dependencies = [
+ "handle-errors",
  "serde",
  "serde_json",
  "tokio",

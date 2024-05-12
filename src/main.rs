@@ -1,6 +1,6 @@
 use warp::{http::Method, Filter};
 
-mod error;
+use handle_errors::return_error;
 mod routes;
 mod store;
 mod types;
@@ -75,7 +75,7 @@ async fn main() {
         .or(get_question_by_id)
         .or(get_answers_by_question_id)
         .with(cors)
-        .recover(error::return_error);
+        .recover(return_error);
 
     println!("[WARP] - Running on http://localhost:3030");
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;

@@ -1,8 +1,8 @@
+use handle_errors::Error;
 use std::collections::HashMap;
 use uuid::Uuid;
 use warp::http::StatusCode;
 
-use crate::error::Error;
 use crate::store::Store;
 use crate::types::{
     answer::{Answer, AnswerId},

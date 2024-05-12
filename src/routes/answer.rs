@@ -44,3 +44,23 @@ pub async fn add_answer(
         .insert(answer.id.clone(), answer);
     Ok(warp::reply::with_status("Answer added", StatusCode::OK))
 }
+
+pub async fn get_answers_by_question_id(
+    question_id: String,
+    store: Store,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    if question_id.is_empty() {
+        return Err(warp::reject::custom(Error::InvalidQuestionId));
+    };
+
+    let answers: Vec<Answer> = store
+        .answers
+        .read()
+        .await
+        .values()
+        .filter(|answer| answer.question_id.0.contains(&question_id))
+        .cloned()
+        .collect();
+
+    Ok(warp::reply::json(&answers))
+}

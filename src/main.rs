@@ -59,12 +59,21 @@ async fn main() {
         .and(warp::body::form())
         .and_then(routes::answer::add_answer);
 
+    let get_answers_by_question_id = warp::get()
+        .and(warp::path("questions"))
+        .and(warp::path::param::<String>())
+        .and(warp::path("answers"))
+        .and(warp::path::end())
+        .and(store_filter.clone())
+        .and_then(routes::answer::get_answers_by_question_id);
+
     let routes = get_questions
         .or(add_question)
         .or(add_answer)
         .or(update_question)
         .or(delete_question)
         .or(get_question_by_id)
+        .or(get_answers_by_question_id)
         .with(cors)
         .recover(error::return_error);
 

@@ -46,15 +46,19 @@ pub async fn update_question(
 pub async fn get_questions(
     params: HashMap<String, String>,
     store: Store,
+    req_id: String,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    log::info!("{} Start querying questions", req_id);
     if !params.is_empty() {
         let res: Vec<Question> = store.questions.read().await.values().cloned().collect();
         let store_length = res.len();
         let pagination = extract_pagination(params, store_length)?;
+        log::info!("{} Pagination set {:?}", req_id, &pagination);
         let res = &res[pagination.start..pagination.end];
 
         Ok(warp::reply::json(&res))
     } else {
+        log::info!("{} No pagination used", req_id);
         let res: Vec<Question> = store.questions.read().await.values().cloned().collect();
 
         Ok(warp::reply::json(&res))

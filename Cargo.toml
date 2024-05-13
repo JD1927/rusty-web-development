@@ -16,3 +16,6 @@ uuid = {version = "1.8.0", features = [
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ]}
 handle-errors ={ path = "handle-errors"}
+# Logging crates
+log = "0.4"
+env_logger = "0.11"

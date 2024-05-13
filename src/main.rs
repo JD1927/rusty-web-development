@@ -1,4 +1,4 @@
-#![warn(clippy::all)]
+// #![warn(clippy::all)]
 
 use warp::{http::Method, Filter};
 
@@ -14,6 +14,18 @@ async fn main() {
     log::error!("This is an error!");
     log::info!("This is info!");
     log::warn!("This is a warning!");
+
+    let log = warp::log::custom(|info| {
+        eprintln!(
+            "{} {} {} {:?} from {} with {:?}",
+            info.method(),
+            info.path(),
+            info.status(),
+            info.elapsed(),
+            info.remote_addr().unwrap(),
+            info.request_headers(),
+        )
+    });
 
     let store = store::Store::new();
     let store_filter = warp::any().map(move || store.clone());
@@ -83,6 +95,7 @@ async fn main() {
         .or(get_question_by_id)
         .or(get_answers_by_question_id)
         .with(cors)
+        .with(log)
         .recover(return_error);
 
     println!("[WARP] - Running on http://localhost:3030");

@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 /// Pagination struc that is gtting extracted
 /// from query params
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Pagination {
-    /// The index of the first item that has to be returned
-    pub start: usize,
-    /// The index of the last item that has to be returned
-    pub end: usize,
+    /// The index of the last item which has to be returned
+    pub limit: Option<i32>,
+    /// The index of the first item which has to be returned
+    pub offset: i32,
 }
 
 /// Extract query parameters from the `/questions` route
@@ -19,32 +19,33 @@ pub struct Pagination {
 /// # Example usage
 /// ```rust
 /// let mut query = HashMap::new();
-/// query.insert("start".to_string(), "1".to_string());
-/// query.insert("end".to_string(), "10".to_string());
+/// query.insert("limit".to_string(), "1".to_string());
+/// query.insert("offset".to_string(), "10".to_string());
 /// let p = types::pagination::extract_pagination(query).unwrap();
-/// assert_eq!(p.start, 1);
-/// assert_eq!(p.end, 10);
+/// assert_eq!(p.limit, 1);
+/// assert_eq!(p.offset, 10);
 /// ```
-pub fn extract_pagination(
-    params: HashMap<String, String>,
-    store_length: usize,
-) -> Result<Pagination, Error> {
-    if let (Some(start), Some(end)) = (params.get("start"), params.get("end")) {
-        // Takes the "start" parameter in the query
-        // and tries to convert it to a number
-        let start = start.parse::<usize>().map_err(Error::ParseInt)?;
-        // Takes the "start" parameter in the query
-        // and tries to convert it to a number
-        let end = end.parse::<usize>().map_err(Error::ParseInt)?;
-
-        // Validates if the start and end are different and in the store length
-        if start < end && start <= store_length && end <= store_length {
-            return Ok(Pagination { start, end });
-        } else {
-            return Err(Error::InvalidRange);
-        }
+pub fn extract_pagination(params: HashMap<String, String>) -> Result<Pagination, Error> {
+    // Could be improved in the future
+    if params.contains_key("limit") && params.contains_key("offset") {
+        return Ok(Pagination {
+            // Takes the "limit" parameter in the query and tries to convert it to a number
+            limit: Some(
+                params
+                    .get("limit")
+                    .unwrap()
+                    .parse::<i32>()
+                    .map_err(Error::ParseInt)?,
+            ),
+            // Takes the "offset" parameter in the query and tries to convert it to a number
+            offset: params
+                .get("offset")
+                .unwrap()
+                .parse::<i32>()
+                .map_err(Error::ParseInt)?,
+        });
     }
     Err(Error::MissingParameters(
-        "Pagination requires 'start' and 'end' filters".to_string(),
+        "Pagination requires at least 'offset' filter".to_string(),
     ))
 }

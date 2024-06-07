@@ -1,3 +1,4 @@
+use sqlx::migrate;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::{http::Method, Filter};
 
@@ -13,6 +14,12 @@ async fn main() {
     // Connection
     // postgres://username:password@localhost:5432/rustwebdev
     let store = store::Store::new("postgres://postgres:password@localhost:5432/rustwebdev").await;
+
+    migrate!()
+        .run(&store.clone().connection)
+        .await
+        .expect("Cannot run migration!");
+
     let store_filter = warp::any().map(move || store.clone());
 
     tracing_subscriber::fmt()

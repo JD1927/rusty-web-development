@@ -30,23 +30,13 @@ impl std::fmt::Display for APILayerError {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Error::ParseInt(ref err) => {
-                write!(f, "Cannot parse parameter: {}", err)
-            }
-            Error::MissingParameters(ref message) => {
-                write!(f, "Missing parameters: {}", message)
-            }
+        match &*self {
+            Error::ParseInt(ref err) => write!(f, "Cannot parse parameter: {}", err),
+            Error::MissingParameters(message) => write!(f, "Missing parameters: {}", message),
             Error::DatabaseQueryError => write!(f, "Cannot update, invalid data!"),
-            Error::ExternalAPIError(ref err) => {
-                write!(f, "Cannot execute: {}", err)
-            }
-            Error::ClientError(ref err) => {
-                write!(f, "External Client error: {}", err)
-            }
-            Error::ServerError(ref err) => {
-                write!(f, "External Server error: {}", err)
-            }
+            Error::ExternalAPIError(err) => write!(f, "Cannot execute: {}", err),
+            Error::ClientError(err) => write!(f, "External Client error: {}", err),
+            Error::ServerError(err) => write!(f, "External Server error: {}", err),
         }
     }
 }

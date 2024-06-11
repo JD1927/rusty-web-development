@@ -11,7 +11,7 @@ mod types;
 #[tokio::main]
 async fn main() {
     let log_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "handle_errors=warn,rusty-web-development=info,warp=warn".to_owned());
+        .unwrap_or_else(|_| "handle_errors=warn,rusty-web-development=warn,warp=warn".to_owned());
     // Connection
     // postgres://username:password@localhost:5432/rustwebdev
     let store = store::Store::new("postgres://postgres:password@localhost:5432/rustwebdev").await;

@@ -125,16 +125,16 @@ impl Store {
 
     pub async fn add_answer(&self, new_answer: NewAnswer) -> Result<Answer, Error> {
         match sqlx::query(
-            "insert into answers (content, question_id)
+            "insert into answers (content, corresponding_question)
             values ($1, $2)
-            returning id, content, question_id",
+            returning id, content, corresponding_question",
         )
         .bind(new_answer.content)
         .bind(new_answer.question_id.0)
         .map(|row: PgRow| Answer {
             id: AnswerId(row.get("id")),
             content: row.get("content"),
-            question_id: QuestionId(row.get("question_id")),
+            question_id: QuestionId(row.get("corresponding_question")),
         })
         .fetch_one(&self.connection)
         .await
@@ -168,12 +168,12 @@ impl Store {
     }
 
     pub async fn get_answers_by_question_id(&self, question_id: i32) -> Result<Vec<Answer>, Error> {
-        match sqlx::query("select * from answers where id = $1")
+        match sqlx::query("select * from answers where corresponding_question = $1")
             .bind(question_id)
             .map(|row: PgRow| Answer {
                 id: AnswerId(row.get("id")),
                 content: row.get("content"),
-                question_id: QuestionId(row.get("question_id")),
+                question_id: QuestionId(row.get("corresponding_question")),
             })
             .fetch_all(&self.connection)
             .await

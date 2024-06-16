@@ -7,22 +7,32 @@ use crate::store::Store;
 use crate::types::pagination::{extract_pagination, Pagination};
 use crate::types::question::{NewQuestion, Question};
 
+#[instrument]
 pub async fn add_question(
     store: Store,
     new_question: NewQuestion,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let title = match check_profanity(new_question.title).await {
-        Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
-    let content = match check_profanity(new_question.content).await {
-        Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
+    // Uses tokio::join! to wrap the async function that returns future, without awaiting it
+    // tokio::spawn (parallelism) and tokio::join! (concurrents)
+    let title = check_profanity(new_question.title);
+    let content = check_profanity(new_question.content);
+    // Run both on parallel, returning a tuple that contains the result for both title and content
+    let (title, content) = tokio::join!(title, content);
+
+    // Check if title has an error
+    match title.is_err() {
+        true => return Err(warp::reject::custom(title.unwrap_err())),
+        false => (),
+    }
+    // Check if content has an error
+    match content.is_err() {
+        true => return Err(warp::reject::custom(content.unwrap_err())),
+        false => (),
+    }
 
     let question = NewQuestion {
-        title,
-        content,
+        title: title.unwrap(),
+        content: content.unwrap(),
         tags: new_question.tags,
     };
 
@@ -32,25 +42,33 @@ pub async fn add_question(
     }
 }
 
+#[instrument]
 pub async fn update_question(
     question_id: i32,
     store: Store,
     question: Question,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let title = match check_profanity(question.title).await {
-        Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
+    // Uses tokio::spawn to wrap the async function that returns future, without awaiting it
+    let title = check_profanity(question.title);
+    let content = check_profanity(question.content);
+    // Run both on parallel, returning a tuple that contains the result for both title and content
+    let (title, content) = tokio::join!(title, content);
 
-    let content = match check_profanity(question.content).await {
-        Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
+    // Check if title has an error
+    match title.is_err() {
+        true => return Err(warp::reject::custom(title.unwrap_err())),
+        false => (),
+    }
+    // Check if content has an error
+    match content.is_err() {
+        true => return Err(warp::reject::custom(content.unwrap_err())),
+        false => (),
+    }
 
     let question = Question {
         id: question.id,
-        title,
-        content,
+        title: title.unwrap(),
+        content: content.unwrap(),
         tags: question.tags,
     };
 
@@ -84,6 +102,7 @@ pub async fn get_questions(
     Ok(warp::reply::json(&res))
 }
 
+#[instrument]
 pub async fn get_question_by_id(
     question_id: i32,
     store: Store,
@@ -96,6 +115,7 @@ pub async fn get_question_by_id(
     Ok(warp::reply::json(&res))
 }
 
+#[instrument]
 pub async fn delete_question(
     question_id: i32,
     store: Store,

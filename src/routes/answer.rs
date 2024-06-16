@@ -1,9 +1,11 @@
+use tracing::instrument;
 use warp::http::StatusCode;
 
 use crate::profanity::check_profanity;
 use crate::store::Store;
 use crate::types::answer::NewAnswer;
 
+#[instrument]
 pub async fn add_answer(
     store: Store,
     new_answer: NewAnswer,
@@ -24,6 +26,7 @@ pub async fn add_answer(
     }
 }
 
+#[instrument]
 pub async fn get_answers_by_question_id(
     question_id: i32,
     store: Store,

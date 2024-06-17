@@ -96,6 +96,20 @@ async fn main() {
         .and(store_filter.clone())
         .and_then(routes::answer::get_answers_by_question_id);
 
+    let registration = warp::post()
+        .and(warp::path("registration"))
+        .and(warp::path::end())
+        .and(store_filter.clone())
+        .and(warp::body::json())
+        .and_then(routes::authentication::register);
+
+    let login = warp::post()
+        .and(warp::path("login"))
+        .and(warp::path::end())
+        .and(store_filter.clone())
+        .and(warp::body::json())
+        .and_then(routes::authentication::login);
+
     let routes = get_questions
         .or(add_question)
         .or(add_answer)
@@ -103,6 +117,8 @@ async fn main() {
         .or(delete_question)
         .or(get_question_by_id)
         .or(get_answers_by_question_id)
+        .or(registration)
+        .or(login)
         .with(cors)
         .with(warp::trace::request())
         .recover(return_error);

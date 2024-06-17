@@ -1,3 +1,4 @@
+use crate::types::account::{Account, AccountId};
 use crate::types::answer::{Answer, AnswerId, NewAnswer};
 use crate::types::question::{NewQuestion, Question, QuestionId};
 use handle_errors::Error;
@@ -46,7 +47,7 @@ impl Store {
             Ok(questions) => Ok(questions),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }
@@ -72,7 +73,7 @@ impl Store {
             Ok(question) => Ok(question),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }
@@ -104,7 +105,7 @@ impl Store {
             Ok(question) => Ok(question),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }
@@ -118,7 +119,7 @@ impl Store {
             Ok(_) => Ok(true),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }
@@ -142,7 +143,7 @@ impl Store {
             Ok(answer) => Ok(answer),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }
@@ -162,7 +163,7 @@ impl Store {
             Ok(question) => Ok(question),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }
@@ -181,7 +182,55 @@ impl Store {
             Ok(answers) => Ok(answers),
             Err(e) => {
                 event!(Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(e))
+            }
+        }
+    }
+
+    pub async fn add_account(&self, account: Account) -> Result<bool, Error> {
+        match sqlx::query(
+            "insert into accounts (email, password)
+            values ($1, $2)",
+        )
+        .bind(account.email)
+        .bind(account.password)
+        .execute(&self.connection)
+        .await
+        {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                event!(
+                    Level::ERROR,
+                    code = e
+                        .as_database_error()
+                        .unwrap()
+                        .code()
+                        .unwrap()
+                        .parse::<i32>()
+                        .unwrap(),
+                    db_message = e.as_database_error().unwrap().message(),
+                    constraint = e.as_database_error().unwrap().constraint().unwrap()
+                );
+                Err(Error::DatabaseQueryError(e))
+            }
+        }
+    }
+
+    pub async fn get_account(&self, email: String) -> Result<Account, Error> {
+        match sqlx::query("select * from accounts where email = $1")
+            .bind(email)
+            .map(|row: PgRow| Account {
+                id: Some(AccountId(row.get("id"))),
+                email: row.get("email"),
+                password: row.get("password"),
+            })
+            .fetch_one(&self.connection)
+            .await
+        {
+            Ok(account) => Ok(account),
+            Err(e) => {
+                event!(Level::ERROR, "{:?}", e);
+                Err(Error::DatabaseQueryError(e))
             }
         }
     }

@@ -34,3 +34,11 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "migrate", "postgr
 reqwest = { version = "0.12", features = ["json"] }
 reqwest-middleware = "0.3"
 reqwest-retry = "0.5"
+# Hashing algorithm
+rust-argon2 = "2.1"
+# Random values
+rand = "0.8"
+# Handle for JWT
+paseto = "2.0"
+# Handler for date and time
+chrono = "0.4.19"

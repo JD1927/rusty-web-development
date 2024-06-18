@@ -1,11 +1,16 @@
+use std::future;
+
 use argon2::{self, Config};
 use chrono::prelude::*;
 use handle_errors::Error;
 use rand::Rng;
 use warp::http::StatusCode;
+use warp::Filter;
 
 use crate::store::Store;
-use crate::types::account::{Account, AccountId};
+use crate::types::account::{Account, AccountId, Session};
+
+const ENCRYPTION_KEY: &str = "RANDOM WORDS WINTER DIST POP OS!";
 
 pub async fn login(store: Store, login: Account) -> Result<impl warp::Reply, warp::Rejection> {
     match store.get_account(login.email).await {
@@ -37,7 +42,7 @@ fn issue_token(account_id: AccountId) -> String {
 
     paseto::tokens::PasetoBuilder::new()
         // Use exactly 32 bytes, otherwise there is a size error
-        .set_encryption_key(&Vec::from("RANDOM WORDS WINTER DIST POP OS!".as_bytes()))
+        .set_encryption_key(&Vec::from(ENCRYPTION_KEY.as_bytes()))
         .set_expiration(&dt)
         .set_not_before(&Utc::now())
         .set_claim("account_id", serde_json::json!(account_id))
@@ -65,4 +70,26 @@ pub fn hash_password(password: &[u8]) -> String {
     let config = Config::default();
 
     argon2::hash_encoded(password, &salt, &config).unwrap()
+}
+
+pub fn verify_token(token: String) -> Result<Session, handle_errors::Error> {
+    let token = paseto::tokens::validate_local_token(
+        &token,
+        None,
+        ENCRYPTION_KEY.as_bytes(),
+        &paseto::tokens::TimeBackend::Chrono,
+    )
+    .map_err(|_| handle_errors::Error::CannotDecryptToken)?;
+
+    serde_json::from_value::<Session>(token).map_err(|_| handle_errors::Error::CannotDecryptToken)
+}
+
+pub fn auth() -> impl Filter<Extract = (Session,), Error = warp::Rejection> + Clone {
+    warp::header::<String>("Authorization").and_then(|token: String| {
+        let token = match verify_token(token) {
+            Ok(t) => t,
+            Err(_) => return future::ready(Err(warp::reject::reject())),
+        };
+        future::ready(Ok(token))
+    })
 }

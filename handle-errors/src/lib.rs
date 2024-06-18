@@ -13,6 +13,8 @@ pub enum Error {
     MissingParameters(String),
     WrongPassword,
     ArgonLibraryError(ArgonError),
+    CannotDecryptToken,
+    Unauthorized,
     ParseInt(num::ParseIntError),
     DatabaseQueryError(sqlx::Error),
     ReqwestAPIError(ReqwestError),
@@ -40,6 +42,8 @@ impl std::fmt::Display for Error {
             Error::MissingParameters(message) => write!(f, "Missing parameters: {}", message),
             Error::WrongPassword => write!(f, "Wrong password!"),
             Error::ArgonLibraryError(_) => write!(f, "Cannot verify password"),
+            Error::CannotDecryptToken => write!(f, "Cannot decrypt token!"),
+            Error::Unauthorized => write!(f, "No permission to change the underlying resource!"),
             Error::DatabaseQueryError(_) => write!(f, "Cannot update, invalid data!"),
             Error::ReqwestAPIError(err) => write!(f, "External API error: {}", err),
             Error::MiddlewareReqwestAPIError(err) => write!(f, "External API error: {}", err),
@@ -60,6 +64,11 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         event!(Level::ERROR, "Database query error");
         match e {
             sqlx::Error::Database(err) => {
+                event!(
+                    Level::ERROR,
+                    "sqlx_error code: {:?}",
+                    err.code().unwrap().parse::<u32>().unwrap()
+                );
                 if err.code().unwrap().parse::<u32>().unwrap() == DUPLICATED_KEY {
                     Ok(warp::reply::with_status(
                         "Account already exists!".to_string(),
@@ -67,13 +76,13 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
                     ))
                 } else {
                     Ok(warp::reply::with_status(
-                        "Cannot update data".to_string(),
+                        "Cannot process data".to_string(),
                         StatusCode::UNPROCESSABLE_ENTITY,
                     ))
                 }
             }
             _ => Ok(warp::reply::with_status(
-                "Cannot update data".to_string(),
+                "Cannot process data".to_string(),
                 StatusCode::UNPROCESSABLE_ENTITY,
             )),
         }
@@ -82,6 +91,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             "Internal Server Error".to_string(),
             StatusCode::INTERNAL_SERVER_ERROR,
+        ))
+    } else if let Some(Error::Unauthorized) = r.find() {
+        event!(Level::ERROR, "Not matching account id");
+        Ok(warp::reply::with_status(
+            "No permission to change the underlying resource".to_string(),
+            StatusCode::UNAUTHORIZED,
         ))
     } else if let Some(Error::WrongPassword) = r.find() {
         event!(Level::ERROR, "Entered wrong password!");

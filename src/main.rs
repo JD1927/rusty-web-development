@@ -1,25 +1,79 @@
+#![warn(clippy::all)]
+
+use clap::Parser;
+use dotenv::dotenv;
 use sqlx::migrate;
+use std::env;
+use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::{http::Method, Filter};
 
 use handle_errors::return_error;
+
 mod profanity;
 mod routes;
 mod store;
 mod types;
 
+/// Q&A web service API
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Which errors we want to log (info, warn or error)
+    #[clap(short, long, default_value = "info")]
+    log_level: String,
+    /// URL for the postgres database
+    #[clap(long, default_value = "localhost")]
+    database_host: String,
+    /// PORT number for the database connection
+    #[clap(long, default_value = "5432")]
+    database_port: u16,
+    /// Database name
+    #[clap(long, default_value = "rustwebdev")]
+    database_name: String,
+    /// Web server port
+    #[clap(long, default_value = "8080")]
+    port: u16,
+}
+
 #[tokio::main]
 async fn main() {
-    let log_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "handle_errors=warn,rusty-web-development=warn,warp=warn".to_owned());
+    dotenv().ok();
+
+    if env::var("BAD_WORDS_API_KEY").is_err() {
+        panic!("Bad words API key not set!");
+    }
+
+    if env::var("PASETO_KEY").is_err() {
+        panic!("PASETO key not set!");
+    }
+    let port = env::var("PORT")
+        .ok()
+        .map(|val| val.parse::<u16>())
+        .unwrap_or(Ok(8080))
+        .map_err(handle_errors::Error::ParseInt)
+        .unwrap();
+
+    let args = Args::parse();
+
+    let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+        format!(
+            "handle_errors={},rusty_web_development={},warp={}",
+            args.log_level, args.log_level, args.log_level
+        )
+    });
     // Connection
     // postgres://username:password@localhost:5432/rustwebdev
-    let store = store::Store::new("postgres://postgres:password@localhost:5432/rustwebdev").await;
+    let store = store::Store::new(&format!(
+        "postgres://postgres:password@{}:{}/{}",
+        args.database_host, args.database_port, args.database_name
+    ))
+    .await;
 
-    migrate!()
+    let _ = migrate!()
         .run(&store.clone().connection)
         .await
-        .expect("Cannot run migration!");
+        .map_err(handle_errors::Error::MigrationError);
 
     let store_filter = warp::any().map(move || store.clone());
 
@@ -127,6 +181,6 @@ async fn main() {
         .with(warp::trace::request())
         .recover(return_error);
 
-    println!("[WARP] - Running on http://localhost:3030");
-    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+    info!("Q&A service build ID:[{}]", env!("RUSTY_WEB_DEV_VERSION"));
+    warp::serve(routes).run(([127, 0, 0, 1], port)).await;
 }

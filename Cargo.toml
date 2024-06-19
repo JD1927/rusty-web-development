@@ -1,7 +1,9 @@
 [package]
 name = "rusty-web-development"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
+build = "build.rs"
+authors = ["Juan Aguirre"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -42,3 +44,9 @@ rand = "0.8"
 paseto = "2.0"
 # Handler for date and time
 chrono = "0.4.19"
+# Handler for configuration files
+config = { version = "0.14", features = ["toml"]}
+# Handler for CLI arguments
+clap = { version = "4.5", features = ["derive"]}
+# Handler for env variables
+dotenv = "0.15"

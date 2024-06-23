@@ -54,10 +54,9 @@ pub fn extract_pagination(
     Err(Error::MissingParameters(PAGINATION_ERROR.to_string()))
 }
 
+#[cfg(test)]
 mod pagination_tests {
-    use super::{
-        extract_pagination, Error, HashMap, Pagination, PAGINATION_ERROR,
-    };
+    use super::*;
 
     #[test]
     fn valid_pagination() {

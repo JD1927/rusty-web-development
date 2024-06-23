@@ -39,7 +39,7 @@ impl std::fmt::Display for APILayerError {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &*self {
-            Error::ParseInt(ref err) => write!(f, "Cannot parse parameter: {}", err),
+            Error::ParseInt(err) => write!(f, "Cannot parse parameter: {}", err),
             Error::MissingParameters(message) => write!(f, "Missing parameters: {}", message),
             Error::WrongPassword => write!(f, "Wrong password!"),
             Error::ArgonLibraryError(_) => write!(f, "Cannot verify password"),

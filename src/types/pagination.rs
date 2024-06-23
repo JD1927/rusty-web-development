@@ -1,9 +1,9 @@
 use handle_errors::Error;
 use std::collections::HashMap;
 
-/// Pagination struc that is gtting extracted
+/// Pagination struct that is getting extracted
 /// from query params
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct Pagination {
     /// The index of the last item which has to be returned
     pub limit: Option<i32>,
@@ -25,6 +25,10 @@ pub struct Pagination {
 /// assert_eq!(p.limit, 1);
 /// assert_eq!(p.offset, 10);
 /// ```
+
+const PAGINATION_ERROR: &str =
+    "Pagination requires 'limit' and 'offset' params!";
+
 pub fn extract_pagination(
     params: HashMap<String, String>,
 ) -> Result<Pagination, Error> {
@@ -47,7 +51,91 @@ pub fn extract_pagination(
                 .map_err(Error::ParseInt)?,
         });
     }
-    Err(Error::MissingParameters(
-        "Pagination requires at least 'offset' filter".to_string(),
-    ))
+    Err(Error::MissingParameters(PAGINATION_ERROR.to_string()))
+}
+
+mod pagination_tests {
+    use super::{
+        extract_pagination, Error, HashMap, Pagination, PAGINATION_ERROR,
+    };
+
+    #[test]
+    fn valid_pagination() {
+        // Arrange
+        let mut params = HashMap::new();
+        params.insert(String::from("limit"), String::from("1"));
+        params.insert(String::from("offset"), String::from("1"));
+        let expected = Pagination {
+            limit: Some(1),
+            offset: 1,
+        };
+        // Act
+        let pagination_result = extract_pagination(params);
+        // Assert
+        assert_eq!(pagination_result.unwrap(), expected);
+    }
+
+    #[test]
+    fn missing_offset_parameter() {
+        // Arrange
+        let mut params = HashMap::new();
+        params.insert(String::from("limit"), String::from("1"));
+        let expected = format!(
+            "{}",
+            Error::MissingParameters(PAGINATION_ERROR.to_string())
+        );
+        // Act
+        let pagination_result =
+            format!("{}", extract_pagination(params).unwrap_err());
+        // Assert
+        assert_eq!(pagination_result, expected);
+    }
+    #[test]
+    fn missing_limit_parameter() {
+        // Arrange
+        let mut params = HashMap::new();
+        params.insert(String::from("offset"), String::from("1"));
+        let expected = format!(
+            "{}",
+            Error::MissingParameters(PAGINATION_ERROR.to_string())
+        );
+        // Act
+        let pagination_result =
+            format!("{}", extract_pagination(params).unwrap_err());
+        // Assert
+        assert_eq!(pagination_result, expected);
+    }
+
+    #[test]
+    fn wrong_offset_type() {
+        // Arrange
+        let mut params = HashMap::new();
+        params.insert(String::from("limit"), String::from("1"));
+        params
+            .insert(String::from("offset"), String::from("NOT_A_NUMBER"));
+        let expected = String::from(
+            "Cannot parse parameter: invalid digit found in string",
+        );
+        // Act
+        let pagination_result =
+            format!("{}", extract_pagination(params).unwrap_err());
+        // Assert
+        assert_eq!(pagination_result, expected);
+    }
+
+    #[test]
+    fn wrong_limit_type() {
+        // Arrange
+        let mut params = HashMap::new();
+        params.insert(String::from("limit"), String::from("NOT_A_NUMBER"));
+        params.insert(String::from("offset"), String::from("1"));
+        let expected = String::from(
+            "Cannot parse parameter: invalid digit found in string",
+        );
+        // Act
+        let pagination_result =
+            format!("{}", extract_pagination(params).unwrap_err());
+        // Assert
+        assert_eq!(pagination_result, expected);
+    }
 }

@@ -2,7 +2,7 @@ use clap::Parser;
 use std::env;
 
 /// Q&A web service API
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, PartialEq)]
 #[clap(author, version, about, long_about = None)]
 pub struct Config {
     /// Which errors we want to log (info, warn or error)
@@ -30,7 +30,6 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> Result<Config, handle_errors::Error> {
-        dotenv::dotenv().ok();
         let config = Config::parse();
         if env::var("BAD_WORDS_API_KEY").is_err() {
             panic!("Bad words API key not set!");
@@ -68,5 +67,47 @@ impl Config {
             db_port,
             db_name,
         })
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    fn set_env() {
+        env::set_var("BAD_WORDS_API_KEY", "yes");
+        env::set_var("PASETO_KEY", "yes");
+        env::set_var("POSTGRES_USER", "user");
+        env::set_var("POSTGRES_PASSWORD", "password");
+        env::set_var("POSTGRES_DB", "db");
+        env::set_var("POSTGRES_HOST", "localhost");
+        env::set_var("POSTGRES_PORT", "5432");
+    }
+
+    #[test]
+    fn unset_and_set_api_key() {
+        // UNSET API KEY
+        // Arrange
+        // Act
+        let result = std::panic::catch_unwind(Config::new);
+        // Assert
+        assert!(result.is_err());
+
+        // SET API KEY
+        // Arrange
+        set_env();
+        let expected = Config {
+            log_level: "info".to_string(),
+            port: 8080,
+            db_user: "user".to_string(),
+            db_password: "password".to_string(),
+            db_host: "localhost".to_string(),
+            db_port: 5432,
+            db_name: "db".to_string(),
+        };
+        // Act
+        let result = Config::new().unwrap();
+        // Assert
+        assert_eq!(result, expected);
     }
 }

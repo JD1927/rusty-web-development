@@ -16,6 +16,9 @@ mod types;
 
 #[tokio::main]
 async fn main() {
+    // Handler for ENV variables
+    dotenv::dotenv().ok();
+
     let config = config::Config::new().expect("Config cannot be set!");
 
     let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {

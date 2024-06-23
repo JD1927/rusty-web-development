@@ -1,7 +1,5 @@
 #![warn(clippy::all)]
 
-use clap::Parser;
-use dotenv::dotenv;
 use sqlx::migrate;
 use std::env;
 use tracing::info;
@@ -10,70 +8,31 @@ use warp::{http::Method, Filter};
 
 use handle_errors::return_error;
 
+mod config;
 mod profanity;
 mod routes;
 mod store;
 mod types;
 
-/// Q&A web service API
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
-    /// Which errors we want to log (info, warn or error)
-    #[clap(short, long, default_value = "info")]
-    log_level: String,
-    /// Web server port
-    #[clap(long, default_value = "8080")]
-    port: u16,
-    /// Database user
-    #[clap(long, default_value = "user")]
-    db_user: String,
-    /// URL for the postgres database
-    #[clap(long, default_value = "localhost")]
-    db_host: String,
-    /// PORT number for the database connection
-    #[clap(long, default_value = "5432")]
-    db_port: u16,
-    /// Database name
-    #[clap(long, default_value = "rustywebdev")]
-    db_name: String,
-}
-
 #[tokio::main]
 async fn main() {
-    dotenv().ok();
-    let args = Args::parse();
-
-    if env::var("BAD_WORDS_API_KEY").is_err() {
-        panic!("Bad words API key not set!");
-    }
-
-    if env::var("PASETO_KEY").is_err() {
-        panic!("PASETO key not set!");
-    }
-    let port = env::var("PORT")
-        .ok()
-        .map(|val| val.parse::<u16>())
-        .unwrap_or(Ok(8080))
-        .map_err(handle_errors::Error::ParseInt)
-        .unwrap();
-    let db_user = env::var("POSTGRES_USER").unwrap_or(args.db_user.to_owned());
-    let db_password = env::var("POSTGRES_PASSWORD").unwrap();
-    let db_host = env::var("POSTGRES_HOST").unwrap_or(args.db_host.to_owned());
-    let db_port = env::var("POSTGRES_PORT").unwrap_or(args.db_port.to_string());
-    let db_name = env::var("POSTGRES_DB").unwrap_or(args.db_name.to_owned());
+    let config = config::Config::new().expect("Config cannot be set!");
 
     let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
         format!(
             "handle_errors={},rusty_web_development={},warp={}",
-            args.log_level, args.log_level, args.log_level
+            config.log_level, config.log_level, config.log_level
         )
     });
     // Connection
     // postgres://username:password@localhost:5432/rustwebdev
     let store = store::Store::new(&format!(
         "postgres://{}:{}@{}:{}/{}",
-        db_user, db_password, db_host, db_port, db_name
+        config.db_user,
+        config.db_password,
+        config.db_host,
+        config.db_port,
+        config.db_name
     ))
     .await;
 
@@ -95,7 +54,12 @@ async fn main() {
     let cors = warp::cors()
         .allow_any_origin()
         .allow_header("content-type")
-        .allow_methods(&[Method::PUT, Method::DELETE, Method::POST, Method::GET]);
+        .allow_methods(&[
+            Method::PUT,
+            Method::DELETE,
+            Method::POST,
+            Method::GET,
+        ]);
 
     let get_questions = warp::get()
         .and(warp::path("questions"))
@@ -188,6 +152,6 @@ async fn main() {
         .with(warp::trace::request())
         .recover(return_error);
 
-    info!("Q&A service build ID:[{}]", env!("RUSTY_WEB_DEV_VERSION"));
-    warp::serve(routes).run(([127, 0, 0, 1], port)).await;
+    info!("Q&A service build ID:{}", env!("RUSTY_WEB_DEV_VERSION"));
+    warp::serve(routes).run(([0, 0, 0, 0], config.port)).await;
 }

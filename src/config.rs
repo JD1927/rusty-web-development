@@ -6,7 +6,7 @@ use std::env;
 #[clap(author, version, about, long_about = None)]
 pub struct Config {
     /// Which errors we want to log (info, warn or error)
-    #[clap(short, long, default_value = "warn")]
+    #[clap(short, long, default_value = "info")]
     pub log_level: String,
     /// Web server port
     #[clap(long, default_value = "8080")]
@@ -15,7 +15,7 @@ pub struct Config {
     #[clap(long, default_value = "postgres")]
     pub db_user: String,
     /// Database password
-    #[clap(long)]
+    #[clap(long, default_value = "postgres")]
     pub db_password: String,
     /// URL for the postgres database
     #[clap(long, default_value = "localhost")]

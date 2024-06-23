@@ -36,7 +36,7 @@ fn verify_password(hash: &str, password: &[u8]) -> Result<bool, argon2::Error> {
 fn issue_token(account_id: AccountId) -> String {
     let current_date_time = Utc::now();
     let dt = current_date_time + chrono::Duration::days(1);
-    let key = env::var("PASETO").unwrap();
+    let key = env::var("PASETO_KEY").unwrap();
 
     paseto::tokens::PasetoBuilder::new()
         // Use exactly 32 bytes, otherwise there is a size error
@@ -71,7 +71,7 @@ pub fn hash_password(password: &[u8]) -> String {
 }
 
 pub fn verify_token(token: String) -> Result<Session, handle_errors::Error> {
-    let key = env::var("PASETO").unwrap();
+    let key = env::var("PASETO_KEY").unwrap();
     let token = paseto::tokens::validate_local_token(
         &token,
         None,

@@ -19,7 +19,10 @@ impl Store {
             .await
         {
             Ok(pool) => pool,
-            Err(e) => panic!("Could not establish DB connection: {}", e),
+            Err(e) => panic!(
+                "Could not establish DB connection: {} with this url: {}",
+                e, &db_url
+            ),
         };
 
         Store {

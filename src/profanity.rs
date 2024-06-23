@@ -1,5 +1,7 @@
 use reqwest_middleware::ClientBuilder;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use reqwest_retry::{
+    policies::ExponentialBackoff, RetryTransientMiddleware,
+};
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -26,9 +28,12 @@ struct BadWordsResponse {
     censored_content: String,
 }
 
-pub async fn check_profanity(content: String) -> Result<String, handle_errors::Error> {
+pub async fn check_profanity(
+    content: String,
+) -> Result<String, handle_errors::Error> {
     let api_key = env::var("BAD_WORDS_API_KEY").unwrap();
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+    let retry_policy =
+        ExponentialBackoff::builder().build_with_max_retries(3);
 
     let client = ClientBuilder::new(reqwest::Client::new())
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
@@ -57,7 +62,9 @@ pub async fn check_profanity(content: String) -> Result<String, handle_errors::E
     }
 }
 
-async fn transform_error(res: reqwest::Response) -> handle_errors::APILayerError {
+async fn transform_error(
+    res: reqwest::Response,
+) -> handle_errors::APILayerError {
     handle_errors::APILayerError {
         status: res.status().as_u16(),
         message: res.json::<APIResponse>().await.unwrap().message,

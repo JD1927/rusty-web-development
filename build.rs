@@ -13,11 +13,17 @@ pub fn generate_cargo_keys() {
             Cow::from(sha)
         }
         Ok(o) => {
-            println!("cargo:warning=Git command failed with status: {}", o.status);
+            println!(
+                "cargo:warning=Git command failed with status: {}",
+                o.status
+            );
             Cow::from("unknown")
         }
         Err(err) => {
-            println!("cargo:warning=Failed to execute git command: {}", err);
+            println!(
+                "cargo:warning=Failed to execute git command: {}",
+                err
+            );
             Cow::from("unknown")
         }
     };
@@ -29,9 +35,12 @@ pub fn generate_cargo_keys() {
 }
 
 fn get_platform() -> String {
-    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let target_arch =
+        std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    let target_os =
+        std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_env =
+        std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
 
     let env_dash = if target_env.is_empty() { "" } else { "-" };
 

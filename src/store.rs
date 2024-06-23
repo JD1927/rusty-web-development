@@ -125,11 +125,13 @@ impl Store {
         question_id: i32,
         account_id: AccountId,
     ) -> Result<bool, Error> {
-        match sqlx::query("delete from questions where id = $1 and account_id = $2")
-            .bind(question_id)
-            .bind(account_id.0)
-            .execute(&self.connection)
-            .await
+        match sqlx::query(
+            "delete from questions where id = $1 and account_id = $2",
+        )
+        .bind(question_id)
+        .bind(account_id.0)
+        .execute(&self.connection)
+        .await
         {
             Ok(_) => Ok(true),
             Err(e) => {
@@ -168,7 +170,10 @@ impl Store {
         }
     }
 
-    pub async fn get_question_by_id(&self, question_id: i32) -> Result<Question, Error> {
+    pub async fn get_question_by_id(
+        &self,
+        question_id: i32,
+    ) -> Result<Question, Error> {
         match sqlx::query("select * from questions where id = $1")
             .bind(question_id)
             .map(|row: PgRow| Question {
@@ -188,16 +193,21 @@ impl Store {
         }
     }
 
-    pub async fn get_answers_by_question_id(&self, question_id: i32) -> Result<Vec<Answer>, Error> {
-        match sqlx::query("select * from answers where corresponding_question = $1")
-            .bind(question_id)
-            .map(|row: PgRow| Answer {
-                id: AnswerId(row.get("id")),
-                content: row.get("content"),
-                question_id: QuestionId(row.get("corresponding_question")),
-            })
-            .fetch_all(&self.connection)
-            .await
+    pub async fn get_answers_by_question_id(
+        &self,
+        question_id: i32,
+    ) -> Result<Vec<Answer>, Error> {
+        match sqlx::query(
+            "select * from answers where corresponding_question = $1",
+        )
+        .bind(question_id)
+        .map(|row: PgRow| Answer {
+            id: AnswerId(row.get("id")),
+            content: row.get("content"),
+            question_id: QuestionId(row.get("corresponding_question")),
+        })
+        .fetch_all(&self.connection)
+        .await
         {
             Ok(answers) => Ok(answers),
             Err(e) => {
@@ -207,7 +217,10 @@ impl Store {
         }
     }
 
-    pub async fn add_account(&self, account: Account) -> Result<bool, Error> {
+    pub async fn add_account(
+        &self,
+        account: Account,
+    ) -> Result<bool, Error> {
         match sqlx::query(
             "insert into accounts (email, password)
             values ($1, $2)",
@@ -229,14 +242,21 @@ impl Store {
                         .parse::<i32>()
                         .unwrap(),
                     db_message = e.as_database_error().unwrap().message(),
-                    constraint = e.as_database_error().unwrap().constraint().unwrap()
+                    constraint = e
+                        .as_database_error()
+                        .unwrap()
+                        .constraint()
+                        .unwrap()
                 );
                 Err(Error::DatabaseQueryError(e))
             }
         }
     }
 
-    pub async fn get_account(&self, email: String) -> Result<Account, Error> {
+    pub async fn get_account(
+        &self,
+        email: String,
+    ) -> Result<Account, Error> {
         match sqlx::query("select * from accounts where email = $1")
             .bind(email)
             .map(|row: PgRow| Account {
@@ -260,11 +280,13 @@ impl Store {
         question_id: i32,
         account_id: &AccountId,
     ) -> Result<bool, Error> {
-        match sqlx::query("select * from questions where id = $1 and account_id = $2")
-            .bind(question_id)
-            .bind(account_id.0)
-            .fetch_optional(&self.connection)
-            .await
+        match sqlx::query(
+            "select * from questions where id = $1 and account_id = $2",
+        )
+        .bind(question_id)
+        .bind(account_id.0)
+        .fetch_optional(&self.connection)
+        .await
         {
             Ok(question) => Ok(question.is_some()),
             Err(e) => {

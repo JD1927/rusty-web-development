@@ -15,5 +15,4 @@ pub struct AccountId(pub i32);
 pub struct Session {
     pub exp: DateTime<Utc>,
     pub account_id: AccountId,
-    pub nbf: DateTime<Utc>, // No used before this timestamp
 }

@@ -53,7 +53,7 @@ fn issue_token(account_id: AccountId) -> String {
         // Use exactly 32 bytes, otherwise there is a size error
         .set_encryption_key(&Vec::from(key.as_bytes()))
         .set_expiration(&dt)
-        .set_not_before(&Utc::now())
+        .set_not_before(&current_date_time)
         .set_claim("account_id", serde_json::json!(account_id))
         .build()
         .expect("Failed to construct paseto token with builder!")
@@ -107,8 +107,31 @@ pub fn auth(
     warp::header::<String>("Authorization").and_then(|token: String| {
         let token = match verify_token(token) {
             Ok(t) => t,
-            Err(_) => return future::ready(Err(warp::reject::reject())),
+            Err(_) => {
+                return future::ready(Err(warp::reject::custom(
+                    handle_errors::Error::Unauthorized,
+                )))
+            }
         };
         future::ready(Ok(token))
     })
+}
+
+#[cfg(test)]
+mod authentication_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn post_questions_auth() {
+        // Arrange
+        env::set_var("PASETO_KEY", "RANDOM WORDS WINTER DIST POP OS!");
+        let token = issue_token(AccountId(3));
+        let filter = auth();
+        // Act
+        let res = warp::test::request()
+            .header("Authorization", token)
+            .filter(&filter);
+        // Assert
+        assert_eq!(res.await.unwrap().account_id, AccountId(3));
+    }
 }

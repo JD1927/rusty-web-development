@@ -16,7 +16,7 @@ pub async fn add_question(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let account_id = session.account_id;
     // Uses tokio::join! to wrap the async function that returns future, without awaiting it
-    // tokio::spawn (parallelism) and tokio::join! (concurrents)
+    // tokio::spawn (parallelism) and tokio::join! (concurrent)
     let title = check_profanity(new_question.title);
     let content = check_profanity(new_question.content);
     // Run both on parallel, returning a tuple that contains the result for both title and content

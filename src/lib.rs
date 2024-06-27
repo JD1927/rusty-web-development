@@ -1,58 +1,21 @@
 #![warn(clippy::all)]
 
 use sqlx::migrate;
-use std::env;
-use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
-use warp::{http::Method, Filter};
+use warp::{http::Method, reply::Reply, Filter};
 
-use handle_errors::return_error;
+use handle_errors::{return_error, Error};
 
-mod config;
+pub mod config;
 mod profanity;
 mod routes;
 mod store;
 mod types;
 
-#[tokio::main]
-async fn main() {
-    // Handler for ENV variables
-    dotenv::dotenv().ok();
-
-    let config = config::Config::new().expect("Config cannot be set!");
-
-    let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
-        format!(
-            "handle_errors={},rusty_web_development={},warp={}",
-            config.log_level, config.log_level, config.log_level
-        )
-    });
-    // Connection
-    // postgres://username:password@localhost:5432/rustwebdev
-    let store = store::Store::new(&format!(
-        "postgres://{}:{}@{}:{}/{}",
-        config.db_user,
-        config.db_password,
-        config.db_host,
-        config.db_port,
-        config.db_name
-    ))
-    .await;
-
-    let _ = migrate!()
-        .run(&store.clone().connection)
-        .await
-        .map_err(handle_errors::Error::MigrationError);
-
+async fn build_routes(
+    store: store::Store,
+) -> impl Filter<Extract = impl Reply> + Clone {
     let store_filter = warp::any().map(move || store.clone());
-
-    tracing_subscriber::fmt()
-        // Use the filter we built above to determine which traces to record.
-        .with_env_filter(log_filter)
-        // Record an event when eac span closes.
-        // This can be used to time our routes durations!
-        .with_span_events(FmtSpan::CLOSE)
-        .init();
 
     let cors = warp::cors()
         .allow_any_origin()
@@ -142,7 +105,7 @@ async fn main() {
         .and(warp::body::json())
         .and_then(routes::authentication::login);
 
-    let routes = get_questions
+    get_questions
         .or(add_question)
         .or(add_answer)
         .or(update_question)
@@ -153,8 +116,48 @@ async fn main() {
         .or(login)
         .with(cors)
         .with(warp::trace::request())
-        .recover(return_error);
+        .recover(return_error)
+}
 
-    info!("Q&A service build ID:{}", env!("RUSTY_WEB_DEV_VERSION"));
+pub async fn setup_store(
+    config: &config::Config,
+) -> Result<store::Store, Error> {
+    // Connection
+    // postgres://username:password@localhost:5432/rustwebdev
+    let store = store::Store::new(&format!(
+        "postgres://{}:{}@{}:{}/{}",
+        config.db_user,
+        config.db_password,
+        config.db_host,
+        config.db_port,
+        config.db_name
+    ))
+    .await;
+
+    let _ = migrate!()
+        .run(&store.clone().connection)
+        .await
+        .map_err(handle_errors::Error::MigrationError);
+
+    let log_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| {
+        format!(
+            "handle_errors={},rusty_web_development={},warp={}",
+            config.log_level, config.log_level, config.log_level
+        )
+    });
+
+    tracing_subscriber::fmt()
+        // Use the filter we built above to determine which traces to record.
+        .with_env_filter(log_filter)
+        // Record an event when eac span closes.
+        // This can be used to time our routes durations!
+        .with_span_events(FmtSpan::CLOSE)
+        .init();
+
+    Ok(store)
+}
+
+pub async fn run(config: config::Config, store: store::Store) {
+    let routes = build_routes(store).await;
     warp::serve(routes).run(([127, 0, 0, 1], config.port)).await;
 }
